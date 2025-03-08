@@ -72,7 +72,6 @@ def extract_data(driver):
         element = wait(item, 10).until(EC.presence_of_element_located((By.XPATH, './/div[@class="bYD8FcVCFyOBiVyITwDj1Q=="]')))
 
         name = element.find_element(By.XPATH, './/span[@class="_0T8-iGxMpV6NEsYEhwkqEg=="]').text
-        # price = element.find_element(By.XPATH, './/div[@class="XvaCkHiisn2EZFq0THwVug=="]').text
         
         # --- Mulai modifikasi ekstraksi harga ---
         # Ambil container harga
@@ -99,18 +98,15 @@ def extract_data(driver):
             price = discount_price if discount_price is not None else original_price
         # --- Akhir modifikasi ekstraksi harga ---
         store = element.find_element(By.XPATH, './/span[@class="T0rpy-LEwYNQifsgB-3SQw== pC8DMVkBZGW7-egObcWMFQ== flip"]').text
-        # location = element.find_element(By.XPATH, './/span[@class="pC8DMVkBZGW7-egObcWMFQ== flip"]').text
-        # try:
-        #     rating = element.find_element(By.XPATH, './/span[@class="_9jWGz3C-GX7Myq-32zWG9w=="]').text
-        # except:
-        #     rating = None
 
         try:
             sold = element.find_element(By.XPATH, './/span[@class="se8WAnkjbVXZNA8mT+Veuw=="]').text
         except:
             sold = None    
 
-        # details_link = element.find_element(By.XPATH, './a').get_property('href')
+        # Ambil link produk
+        link_element = item.find_element(By.XPATH, './/a')
+        details_link = link_element.get_attribute('href')
 
         # store data to the dictionary
         data = {
@@ -118,9 +114,8 @@ def extract_data(driver):
             'price': price,
             'store': store,
             # 'location': location,
-            # 'rating': rating,
             'sold': sold,
-            # 'details_link': details_link
+            'details_link': details_link
         }
 
         # append data to product_data

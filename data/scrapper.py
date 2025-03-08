@@ -5,6 +5,7 @@ from tqdm import tqdm
 
 # Selenium Imports
 from selenium import webdriver as wb
+from selenium.webdriver import ActionChains
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait as wait
@@ -70,53 +71,86 @@ def extract_data(driver, product_data):
 
     # Loop untuk ekstraksi data produk yang ditemukan
     for item in tqdm(data_items, desc="Memproses produk"):
-        # Dapatkan elemen utama
-        element = wait(item, 20).until(
-            EC.visibility_of_element_located(
-                (By.XPATH, './/div[@class="bYD8FcVCFyOBiVyITwDj1Q=="]')
-            )
-        )
 
         # Ambil nama produk
-        name = element.find_element(
-            By.XPATH, './/span[@class="_0T8-iGxMpV6NEsYEhwkqEg=="]'
-        ).text
+        try:
+            name = item.find_element(
+                By.XPATH, './/span[@class="_0T8-iGxMpV6NEsYEhwkqEg=="]'
+            ).text
+        except:
+            continue  # lompat ke item berikutnya
 
         # Ambil container harga
-        price_container = element.find_element(
-            By.XPATH, './/div[contains(@class, "XvaCkHiisn2EZFq0THwVug==")]'
-        )
-        price_elements = price_container.find_elements(
-            By.XPATH, './/div[contains(@class, "_67d6E1xDKIzw+i2D2L0tjw==")]'
-        )
+        try:
+            # Mencari container harga
+            price_container = item.find_element(
+                By.XPATH, './/div[contains(@class, "XvaCkHiisn2EZFq0THwVug==")]'
+            )
+            
+            # Mencari elemen-elemen terkait harga (bisa jadi satu atau beberapa)
+            price_elements = price_container.find_elements(
+                By.XPATH, './/div[contains(@class, "_67d6E1xDKIzw+i2D2L0tjw==")]'
+            )
 
-        # Proses untuk menentukan apakah harga diskon atau tidak
-        if len(price_elements) == 1:
-            # Tidak ada diskon
-            price = price_elements[0].text
-            original_price = price
-            discount_price = None
-        else:
-            # Ada diskon
-            discount_price = None
-            original_price = None
-            for p_el in price_elements:
-                class_attr = p_el.get_attribute("class")
-                if "t4jWW3NandT5hvCFAiotYg==" in class_attr:
-                    discount_price = p_el.text  # harga diskon
-                else:
-                    original_price = p_el.text  # harga asli
-            # Pilih harga diskon jika tersedia, jika tidak ya harga asli
-            price = discount_price if discount_price else original_price
+            # Kalau sama sekali tidak ada price_elements, skip item
+            if not price_elements:
+                continue
 
-        # Ambil nama toko
-        store = element.find_element(
-            By.XPATH, './/span[@class="T0rpy-LEwYNQifsgB-3SQw== pC8DMVkBZGW7-egObcWMFQ== flip"]'
-        ).text
+            # Jika hanya ada satu elemen, artinya tidak ada diskon
+            if len(price_elements) == 1:
+                price = price_elements[0].text
+                original_price = price
+                discount_price = None
+            else:
+                # Ada lebih dari satu elemen (harga diskon + harga asli)
+                discount_price = None
+                original_price = None
+                for p_el in price_elements:
+                    class_attr = p_el.get_attribute("class")
+                    if "t4jWW3NandT5hvCFAiotYg==" in class_attr:
+                        discount_price = p_el.text  # harga diskon
+                    else:
+                        original_price = p_el.text  # harga asli
+                
+                # Pilih harga diskon jika tersedia, jika tidak ya harga asli
+                price = discount_price if discount_price else original_price
+
+        except:
+            # Jika container harga atau element harga tidak ditemukan
+            # langsung skip item
+            continue
+
+
+        # Ambil nama toko dan daerah
+        try:
+            # Elemen store name (sebelum hover)
+            store_element = wait(item, 5).until(
+                EC.presence_of_element_located((By.XPATH, './/span[contains(@class,"T0rpy-LEwYNQifsgB-3SQw==")]'))
+            )
+            store = store_element.text
+        except:
+            continue
+
+        # Lakukan hover agar teks “flip” muncul
+        try:
+            actions = ActionChains(driver)
+            actions.move_to_element(store_element).perform()
+            time.sleep(1)  # jeda singkat agar animasi flip muncul
+        except:
+            continue
+
+        # Setelah hover, lokasi sering muncul di elemen berbeda atau teks sama berganti
+        # Misalnya di screenshot, lokasi ada di <span class="pC8DMVkBZGW7-egObcWMFQ== flip">
+        try:
+            location_element = item.find_element(By.XPATH, './/span[@class="pC8DMVkBZGW7-egObcWMFQ== flip"]')
+            location = location_element.text
+        except:
+            location = None
+
 
         # Ambil jumlah terjual (jika ada)
         try:
-            sold = element.find_element(
+            sold = item.find_element(
                 By.XPATH, './/span[@class="se8WAnkjbVXZNA8mT+Veuw=="]'
             ).text
         except:
@@ -131,6 +165,7 @@ def extract_data(driver, product_data):
             'name': name,
             'price': price,
             'store': store,
+            'location' : location,
             'sold': sold,
             'details_link': details_link
         }

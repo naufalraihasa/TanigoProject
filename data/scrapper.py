@@ -72,12 +72,38 @@ def extract_data(driver):
         element = wait(item, 10).until(EC.presence_of_element_located((By.XPATH, './/div[@class="bYD8FcVCFyOBiVyITwDj1Q=="]')))
 
         name = element.find_element(By.XPATH, './/span[@class="_0T8-iGxMpV6NEsYEhwkqEg=="]').text
-        price = element.find_element(By.XPATH, './/div[@class="XvaCkHiisn2EZFq0THwVug=="]').text
-        location = element.find_element(By.XPATH, './/span[@class="pC8DMVkBZGW7-egObcWMFQ== flip"]').text
-        try:
-            rating = element.find_element(By.XPATH, './/span[@class="_9jWGz3C-GX7Myq-32zWG9w=="]').text
-        except:
-            rating = None
+        # price = element.find_element(By.XPATH, './/div[@class="XvaCkHiisn2EZFq0THwVug=="]').text
+        
+        # --- Mulai modifikasi ekstraksi harga ---
+        # Ambil container harga
+        price_container = element.find_element(By.XPATH, './/div[contains(@class, "XvaCkHiisn2EZFq0THwVug==")]')
+        # Ambil semua elemen harga yang ada di dalam container tersebut
+        price_elements = price_container.find_elements(By.XPATH, './/div[contains(@class, "_67d6E1xDKIzw+i2D2L0tjw==")]')
+        
+        if len(price_elements) == 1:
+            # Jika hanya ada satu elemen, artinya harga tidak diskon
+            price = price_elements[0].text
+            original_price = price  # bisa disimpan juga jika diperlukan
+            discount_price = None
+        else:
+            # Jika terdapat lebih dari satu elemen, cek atribut class untuk menentukan harga diskon dan harga asli
+            discount_price = None
+            original_price = None
+            for p_el in price_elements:
+                class_attr = p_el.get_attribute("class")
+                if "t4jWW3NandT5hvCFAiotYg==" in class_attr:
+                    discount_price = p_el.text  # harga diskon
+                else:
+                    original_price = p_el.text  # harga asli
+            # Pilih harga yang ingin disimpan, misalnya jika diskon ada, ambil harga diskon
+            price = discount_price if discount_price is not None else original_price
+        # --- Akhir modifikasi ekstraksi harga ---
+        store = element.find_element(By.XPATH, './/span[@class="T0rpy-LEwYNQifsgB-3SQw== pC8DMVkBZGW7-egObcWMFQ== flip"]').text
+        # location = element.find_element(By.XPATH, './/span[@class="pC8DMVkBZGW7-egObcWMFQ== flip"]').text
+        # try:
+        #     rating = element.find_element(By.XPATH, './/span[@class="_9jWGz3C-GX7Myq-32zWG9w=="]').text
+        # except:
+        #     rating = None
 
         try:
             sold = element.find_element(By.XPATH, './/span[@class="se8WAnkjbVXZNA8mT+Veuw=="]').text
@@ -90,8 +116,9 @@ def extract_data(driver):
         data = {
             'name': name,
             'price': price,
-            'location': location,
-            'rating': rating,
+            'store': store,
+            # 'location': location,
+            # 'rating': rating,
             'sold': sold,
             # 'details_link': details_link
         }
@@ -128,6 +155,6 @@ df = pd.DataFrame(product_data)
 
 now = datetime.datetime.today().strftime('%d-%m-%Y')
 
-# export data to csv and json
-df.to_csv(f'sample_data_{now}.csv', index=False)
-df.to_json(f'sample_data_{now}.json', orient='records')
+# Ekspor data ke CSV dan Excel
+df.to_csv(f'Tokopedia_{now}.csv', index=False)
+df.to_excel(f'Tokopedia_{now}.xlsx', index=False)

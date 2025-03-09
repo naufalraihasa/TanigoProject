@@ -252,8 +252,8 @@ def main():
     # Simpan data yang telah di-scrape ke dalam file CSV dan Excel
     df = pd.DataFrame(product_data)
     now = datetime.datetime.today().strftime('%d-%m-%Y')
-    df.to_csv(f'Tokopedia_{now}.csv', index=False)
-    df.to_excel(f'Tokopedia_{now}.xlsx', index=False)
+    df.to_csv(f'Tokopedia_Moringa_Infusition_{now}.csv', index=False)
+    df.to_excel(f'Tokopedia_Moringa_Infusition_{now}.xlsx', index=False)
     print(f"\nScraping selesai. File disimpan sebagai Tokopedia_{now}.csv dan Tokopedia_{now}.xlsx")
 
 if __name__ == "__main__":

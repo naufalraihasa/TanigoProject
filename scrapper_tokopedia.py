@@ -279,7 +279,7 @@ def scrolling(driver):
             "window.scrollTo(0, document.body.scrollHeight / {});".format(scheight)
         )
         time.sleep(0.3)
-        scheight += 0.1
+        scheight += 0.15
 
 def reverse_scrolling(driver):
     body = driver.find_element(By.TAG_NAME, 'body')
@@ -293,7 +293,7 @@ def extract_data(driver, product_data):
     for attempt in range(max_retries):
         try:
             scrolling(driver)
-            data_items = wait(driver, 10).until(
+            data_items = wait(driver, 5).until(
                 EC.visibility_of_all_elements_located(
                     (By.XPATH, '//div[contains(@class, "css-5wh65g")]')
                 )
@@ -416,47 +416,89 @@ def extract_data(driver, product_data):
         except:
             continue
 
-        # --- BAGIAN BUKA DETAIL PRODUK ---
+        # # --- BAGIAN BUKA DETAIL PRODUK ---
+        # description = None
+        # rating = "0"  # Default rating = 0 jika tidak ditemukan
+        # main_window = driver.current_window_handle
+
+        # try:
+        #     driver.execute_script(f"window.open('{details_link}','_blank');")
+        #     driver.switch_to.window(driver.window_handles[-1])
+
+        #     # Tunggu elemen detail
+        #     wait(driver, 5).until(
+        #         EC.visibility_of_element_located((By.CSS_SELECTOR, 'div.css-1wa8o67'))
+        #     )
+
+        #     # Ambil deskripsi
+        #     try:
+        #         desc_element = driver.find_element(
+        #             By.CSS_SELECTOR,
+        #             'div.css-1wa8o67 span.css-11oczh8.eytdjj00'
+        #         )
+        #         description = desc_element.text
+        #     except (NoSuchElementException, TimeoutException):
+        #         pass
+
+        #     # Ambil rating
+        #     try:
+        #         rating_element = driver.find_element(
+        #             By.XPATH,
+        #             '//span[@class="main" and @data-testid="lblPDPDetailProductRatingNumber"]'
+        #         )
+        #         rating = rating_element.text
+        #     except NoSuchElementException:
+        #         rating = "0"
+
+        # except (TimeoutException, NoSuchElementException):
+        #     # Gagal memuat halaman detail atau elemen rating
+        #     pass
+        # finally:
+        #     driver.close()
+        #     driver.switch_to.window(main_window)
+        # # --- SELESAI BAGIAN DETAIL ---
+        
+        # --- OPEN DETAIL TAB ---
         description = None
-        rating = "0"  # Default rating = 0 jika tidak ditemukan
+        rating = "0"  # Default rating value
         main_window = driver.current_window_handle
 
         try:
-            driver.execute_script(f"window.open('{details_link}','_blank');")
-            driver.switch_to.window(driver.window_handles[-1])
-
-            # Tunggu elemen detail
-            wait(driver, 10).until(
+            # Open new tab using Selenium 4 method if available
+            driver.switch_to.new_window('tab')
+            driver.get(details_link)
+            
+            # Wait for full page load
+            wait(driver, 15).until(
+                lambda d: d.execute_script("return document.readyState") == "complete"
+            )
+            
+            # Wait for the element that indicates the detail section is loaded
+            wait(driver, 15).until(
                 EC.visibility_of_element_located((By.CSS_SELECTOR, 'div.css-1wa8o67'))
             )
-
-            # Ambil deskripsi
+            
+            # Extract description
             try:
-                desc_element = driver.find_element(
-                    By.CSS_SELECTOR,
-                    'div.css-1wa8o67 span.css-11oczh8.eytdjj00'
-                )
+                desc_element = driver.find_element(By.CSS_SELECTOR, 'div.css-1wa8o67 span.css-11oczh8.eytdjj00')
                 description = desc_element.text
             except (NoSuchElementException, TimeoutException):
                 pass
 
-            # Ambil rating
+            # Extract rating
             try:
-                rating_element = driver.find_element(
-                    By.XPATH,
-                    '//span[@class="main" and @data-testid="lblPDPDetailProductRatingNumber"]'
-                )
+                rating_element = driver.find_element(By.XPATH, '//span[@class="main" and @data-testid="lblPDPDetailProductRatingNumber"]')
                 rating = rating_element.text
             except NoSuchElementException:
                 rating = "0"
 
-        except (TimeoutException, NoSuchElementException):
-            # Gagal memuat halaman detail atau elemen rating
-            pass
+        except TimeoutException:
+            print("Detail page took too long to load, skipping this product.")
         finally:
             driver.close()
             driver.switch_to.window(main_window)
-        # --- SELESAI BAGIAN DETAIL ---
+        # --- END DETAIL SECTION ---
+
 
         data = {
             'name': name,
@@ -495,7 +537,7 @@ def main():
         extract_data(driver, product_data)
 
         try:
-            next_page = wait(driver, 20).until(
+            next_page = wait(driver, 5).until(
                 EC.element_to_be_clickable(
                     (By.CSS_SELECTOR, '[aria-label="Laman berikutnya"]')
                 )
@@ -507,7 +549,7 @@ def main():
             time.sleep(2)
             reverse_scrolling(driver)
             try:
-                next_page = wait(driver, 20).until(
+                next_page = wait(driver, 5).until(
                     EC.element_to_be_clickable(
                         (By.CSS_SELECTOR, '[aria-label="Laman berikutnya"]')
                     )

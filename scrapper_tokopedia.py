@@ -313,34 +313,70 @@ def extract_data(driver, product_data):
         except:
             continue
 
+        # try:
+        #     price_container = item.find_element(
+        #         By.XPATH, './/div[contains(@class, "XvaCkHiisn2EZFq0THwVug==")]'
+        #     )
+        #     price_elements = price_container.find_elements(
+        #         By.XPATH, './/div[contains(@class, "_67d6E1xDKIzw+i2D2L0tjw==")]'
+        #     )
+
+        #     if not price_elements:
+        #         continue
+
+        #     if len(price_elements) == 1:
+        #         price = price_elements[0].text
+        #         original_price = price
+        #         discount_price = None
+        #     else:
+        #         discount_price = None
+        #         original_price = None
+        #         for p_el in price_elements:
+        #             class_attr = p_el.get_attribute("class")
+        #             if "t4jWW3NandT5hvCFAiotYg==" in class_attr:
+        #                 discount_price = p_el.text
+        #             else:
+        #                 original_price = p_el.text
+        #         price = discount_price if discount_price else original_price
+
+        # except:
+        #     continue
+        
+        
         try:
-            price_container = item.find_element(
-                By.XPATH, './/div[contains(@class, "XvaCkHiisn2EZFq0THwVug==")]'
+            # Coba ambil harga diskon
+            discounted_elem = item.find_element(
+                By.XPATH,
+                './/div[contains(@class, "_67d6E1xDKIzw+i2D2L0tjw== ") and contains(@class, "t4jWW3NandT5hvCFAiotYg==")]'
             )
-            price_elements = price_container.find_elements(
-                By.XPATH, './/div[contains(@class, "_67d6E1xDKIzw+i2D2L0tjw==")]'
+            discounted_price = discounted_elem.text
+
+            # Ambil harga normal dari elemen <span>
+            original_elem = item.find_element(
+                By.XPATH,
+                './/span[@class="q6wH9+Ht7LxnxrEgD22BCQ=="]'
             )
+            original_price = original_elem.text
 
-            if not price_elements:
-                continue
+            # Gunakan harga diskon sebagai harga utama
+            price = discounted_price
 
-            if len(price_elements) == 1:
-                price = price_elements[0].text
-                original_price = price
-                discount_price = None
-            else:
-                discount_price = None
-                original_price = None
-                for p_el in price_elements:
-                    class_attr = p_el.get_attribute("class")
-                    if "t4jWW3NandT5hvCFAiotYg==" in class_attr:
-                        discount_price = p_el.text
-                    else:
-                        original_price = p_el.text
-                price = discount_price if discount_price else original_price
-
+        except NoSuchElementException:
+            # Jika tidak ada diskon, ambil harga normal dari <div>
+            normal_elem = item.find_element(
+                By.XPATH,
+                './/div[@class="_67d6E1xDKIzw+i2D2L0tjw== "]'
+            )
+            price = normal_elem.text
+            original_price = price
+            discounted_price = None
+            
+        try:
+            discount = item.find_element(
+                By.XPATH, './/span[@class="vRrrC5GSv6FRRkbCqM7QcQ=="]'
+            ).text
         except:
-            continue
+            discount = None
 
         try:
             store_element = wait(item, 5).until(
@@ -424,7 +460,9 @@ def extract_data(driver, product_data):
 
         data = {
             'name': name,
-            'price': price,
+            'original_price': original_price,
+            'discounted_price' : discounted_price,
+            'discount' : discount,
             'store': store,
             'location': location,
             'sold': sold,
@@ -486,9 +524,9 @@ def main():
 
     df = pd.DataFrame(product_data)
     now = datetime.datetime.today().strftime('%d-%m-%Y')
-    df.to_csv(f'Tokopedia_Rating_{now}.csv', index=False)
-    df.to_excel(f'Tokopedia_Rating_{now}.xlsx', index=False)
-    print(f"\nScraping selesai. File disimpan sebagai Tokopedia_Rating_{now}.csv dan Tokopedia_{now}.xlsx")
+    df.to_csv(f'Tokopedia_Moringa_{now}.csv', index=False)
+    df.to_excel(f'Tokopedia_Moringa_{now}.xlsx', index=False)
+    print(f"\nScraping selesai. File disimpan sebagai Tokopedia_Moringa_{now}.csv dan Tokopedia_Moringa_{now}.xlsx")
 
 if __name__ == "__main__":
     main()

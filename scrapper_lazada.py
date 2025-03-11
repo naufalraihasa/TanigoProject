@@ -66,7 +66,7 @@ def extract_data(driver, product_data):
 
     # Process only the first 5 products for testing
     for index, item in enumerate(tqdm(data_items, desc="Memproses produk")):
-        if index >= 10:
+        if index >= 3:
             break
         
         # Ambil nama produk
@@ -131,7 +131,6 @@ def extract_data(driver, product_data):
                 EC.visibility_of_element_located((By.XPATH, '//div[@class="pdp-product-detail"]'))
             )
             
-            # Ambil deskripsi produk
             try:
                 description = driver.find_element(By.XPATH, '//div[@class="pdp-product-detail"]').text
             except NoSuchElementException:
@@ -142,7 +141,6 @@ def extract_data(driver, product_data):
                 EC.visibility_of_element_located((By.XPATH, '//div[@class="pdp-product-brand"]'))
             )
             
-            # Brand
             try:
                 brand = wait(driver, 10).until(
                     EC.presence_of_element_located((
@@ -162,7 +160,7 @@ def extract_data(driver, product_data):
             except (TimeoutException, NoSuchElementException):
                 store = None
 
-            # Mapping baru sesuai gambar terbaru
+            # Mapping
             BASE64_TO_STAR = {
                 "ASUVORK5CYII=": 0.0,   # 0-star
                 "ElFTkSuQmCC":   0.5,   # 0.5-star

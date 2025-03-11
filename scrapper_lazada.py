@@ -64,7 +64,11 @@ def extract_data(driver, product_data):
             driver.refresh()
             time.sleep(3)
 
-    for item in tqdm(data_items, desc="Memproses produk"):
+    # Process only the first 5 products for testing
+    for index, item in enumerate(tqdm(data_items, desc="Memproses produk")):
+        if index >= 10:
+            break
+        
         # Ambil nama produk
         try:
             name = item.find_element(By.XPATH, './/div[@class="RfADt"]').text
@@ -100,14 +104,7 @@ def extract_data(driver, product_data):
         description = None
         store = None
         brand = None
-        rating = 0.0  # default rating 0
-        
-        # Dictionary pemetaan substring base64 ke nilai bintang
-        BASE64_TO_STAR = {
-            "ASUVORK5CYII=": 0.0,  # 0 bintang
-            "ElFTkSuQmCC":   0.5,  # 0.5 bintang
-            "BJRU5ErkJggg==": 1.0  # 1 bintang
-        }
+        # rating = 0.0  # default rating 0
 
         main_window = driver.current_window_handle
 
@@ -116,67 +113,74 @@ def extract_data(driver, product_data):
             driver.execute_script(f"window.open('{details_link}','_blank');")
             driver.switch_to.window(driver.window_handles[-1])
 
+            # Tunggu hingga halaman utama benar-benar termuat
+            wait(driver, 15).until(EC.presence_of_element_located(
+                (By.TAG_NAME, 'body')))
+            time.sleep(2)  # tambahan waktu tunggu ekstra jika perlu
+
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight/2);")
+            time.sleep(1)
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(1)
+
+
             # Tunggu hingga elemen detail produk termuat (sesuaikan selector jika perlu)
             
             # description
             wait(driver, 10).until(
-                EC.visibility_of_element_located((By.XPATH, '//div[@class="html-content detail-content"]'))
+                EC.visibility_of_element_located((By.XPATH, '//div[@class="pdp-product-detail"]'))
             )
+            
+            # Ambil deskripsi produk
+            try:
+                description = driver.find_element(By.XPATH, '//div[@class="pdp-product-detail"]').text
+            except NoSuchElementException:
+                pass
             
             # brand
             wait(driver, 10).until(
-                EC.visibility_of_element_located((By.XPATH, '//a[@class="pdp-link pdp-link_size_s pdp-link_theme_blue pdp-product-brand__brand-link"]'))
+                EC.visibility_of_element_located((By.XPATH, '//div[@class="pdp-product-brand"]'))
             )
             
-            # rating
-            wait(driver, 10).until(
-                EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'i._9-ogB.Dy1nx'))
-            )
-            
-            # store
-            wait(driver, 10).until(
-                EC.visibility_of_element_located((By.XPATH, '//a[@class="pdp-link pdp-link_size_l pdp-link_theme_black seller-name__detail-name"]'))
-            )
+            # Brand
+            try:
+                brand = wait(driver, 10).until(
+                    EC.presence_of_element_located((
+                        By.XPATH, '//div[contains(@class, "pdp-product-brand")]//a[contains(@class, "pdp-product-brand__brand-link")]'
+                    ))
+                ).text
+            except (TimeoutException, NoSuchElementException):
+                brand = None
 
-            # Ambil deskripsi produk
+            # Store
             try:
-                description = driver.find_element(By.XPATH, '//div[@class="html-content detail-content"]').text
-            except NoSuchElementException:
-                pass
+                store = wait(driver, 10).until(
+                    EC.presence_of_element_located((
+                        By.XPATH, '//div[contains(@class, "seller-name__detail")]//a[contains(@class, "seller-name__detail-name")]'
+                    ))
+                ).text
+            except (TimeoutException, NoSuchElementException):
+                store = None
 
-            # Ambil nama toko
-            try:
-                store = driver.find_element(By.XPATH, '//a[@class="pdp-link pdp-link_size_l pdp-link_theme_black seller-name__detail-name"]').text
-            except NoSuchElementException:
-                pass
-            
-            # Ambil nama brand
-            try:
-                brand = driver.find_element(By.XPATH, '//a[@class="pdp-link pdp-link_size_s pdp-link_theme_blue pdp-product-brand__brand-link"]').text
-            except NoSuchElementException:
-                pass
-            
-            # Ambil rating produk berbasis <i class="_9-ogB Dy1nx">
-            try:
-                rating_elements = driver.find_elements(By.CSS_SELECTOR, 'i._9-ogB.Dy1nx')
-                total_stars = 0.0
-                for rating_elem in rating_elements:
-                    # Ambil properti background-image dari elemen rating
-                    bg_img = rating_elem.value_of_css_property("background-image")
-                    # bg_img diharapkan berbentuk: url("data:image/png;base64,...")
-                    if bg_img.startswith('url("') and bg_img.endswith('")'):
-                        data_url = bg_img[5:-2]  # hapus 'url("' dan '")'
-                    else:
-                        data_url = ""
-                    matched = False
-                    for base64_pattern, star_value in BASE64_TO_STAR.items():
-                        if base64_pattern in data_url:
-                            total_stars += star_value
-                            matched = True
-                            break
-                rating = total_stars
-            except Exception:
-                rating = 0.0
+            # Mapping baru sesuai gambar terbaru
+            BASE64_TO_STAR = {
+                "ASUVORK5CYII=": 0.0,   # 0-star
+                "ElFTkSuQmCC":   0.5,   # 0.5-star
+                "BJRU5ErkJggg==": 1.0   # 1-star
+            }
+
+
+            rating_elements = driver.find_elements(By.CSS_SELECTOR, 'div.pdp-review-summary img.star')
+            total_stars = 0.0
+            for img in rating_elements:
+                img_src = img.get_attribute("src")
+                for base64_key, star_value in BASE64_TO_STAR.items():
+                    if base64_key in img_src:
+                        total_stars += star_value
+                        break
+            rating = total_stars
+
+
 
         except (TimeoutException, NoSuchElementException):
             pass

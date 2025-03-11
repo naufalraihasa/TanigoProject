@@ -65,10 +65,7 @@ def extract_data(driver, product_data):
             time.sleep(3)
 
     # Process only the first 5 products for testing
-    for index, item in enumerate(tqdm(data_items, desc="Memproses produk")):
-        if index >= 3:
-            break
-        
+    for item in tqdm(data_items, desc="Memproses produk"):
         # Ambil nama produk
         try:
             name = item.find_element(By.XPATH, './/div[@class="RfADt"]').text

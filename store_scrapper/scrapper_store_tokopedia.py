@@ -1,4 +1,5 @@
 import time
+import random
 import json
 import re
 import urllib3
@@ -51,8 +52,20 @@ def setup_driver():
     """
     Menginisialisasi Selenium Chrome WebDriver dengan waktu tunggu implisit.
     """
-    driver = wb.Chrome()
+    
+    # Randomized User-Agent list
+    USER_AGENTS = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.1 Safari/605.1.15',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Firefox/119.0',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:102.0) Gecko/20100101 Firefox/102.0'
+    ]
+    
+    options = wb.ChromeOptions()
+    options.add_argument(f'user-agent={random.choice(USER_AGENTS)}')
+    driver = wb.Chrome(options=options)
     driver.implicitly_wait(5)
+    
     return driver
 
 def dynamic_scroll(driver, pause_time=1.0, max_iter=20):

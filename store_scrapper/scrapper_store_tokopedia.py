@@ -29,7 +29,7 @@ def load_keyword(json_file_path):
         print("Error loading keyword from config:", e)
         return None
 
-def load_shop_urls(csv_file='tokopedia_shops.csv'):
+def load_shop_urls(csv_file='shops.csv'):
     """
     Memuat URL toko dari file CSV.
     """

@@ -50,10 +50,9 @@ def get_shop_name(url):
 
 def setup_driver():
     """
-    Menginisialisasi Selenium Chrome WebDriver dengan waktu tunggu implisit.
+    Menginisialisasi Selenium Chrome WebDriver dengan waktu tunggu implisit dan
+    User-Agent yang di-random.
     """
-    
-    # Randomized User-Agent list
     USER_AGENTS = [
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.1 Safari/605.1.15',
@@ -65,17 +64,16 @@ def setup_driver():
     options.add_argument(f'user-agent={random.choice(USER_AGENTS)}')
     driver = wb.Chrome(options=options)
     driver.implicitly_wait(5)
-    
     return driver
 
 def dynamic_scroll(driver, pause_time=1.0, max_iter=20):
     """
-    Melakukan scrolling secara dinamis untuk memuat seluruh produk.
+    Melakukan scrolling dinamis untuk memuat seluruh produk.
     Proses:
       1. Scroll ke bawah penuh.
       2. Scroll ke tengah halaman.
       3. Scroll ke bawah lagi.
-    Proses ini diulang hingga tidak ditemukan produk baru.
+    Diulang hingga tidak ada penambahan jumlah produk.
     """
     last_count = 0
     for _ in range(max_iter):
@@ -93,28 +91,38 @@ def dynamic_scroll(driver, pause_time=1.0, max_iter=20):
         last_count = current_count
     return last_count
 
-
-def get_product_description(driver, product_url):
+def get_product_description(driver, product_url, timeout=5):
     """
     Membuka halaman detail produk di tab baru dan mengambil deskripsi produk.
-    Mengembalikan teks deskripsi atau None jika tidak ditemukan.
+    Jika halaman tidak termuat dalam waktu 'timeout' detik, maka mengembalikan
+    nilai sentinel "TIMEOUT" untuk menandakan bahwa produk ini harus di-skip.
     """
     description = None
     main_window = driver.current_window_handle
+    timed_out = False
     try:
         driver.execute_script(f"window.open('{product_url}', '_blank');")
         driver.switch_to.window(driver.window_handles[-1])
-        # Tunggu hingga elemen detail produk termuat
-        wait(driver, 10).until(
-            EC.visibility_of_element_located((By.CSS_SELECTOR, 'div.css-1wa8o67'))
-        )
         try:
-            desc_element = driver.find_element(By.CSS_SELECTOR, 'div.css-1wa8o67 span.css-11oczh8.eytdjj00')
-            description = desc_element.text
-        except (NoSuchElementException, TimeoutException):
-            description = None
+            # Gunakan timeout lebih pendek untuk menghindari RTO
+            wait(driver, timeout).until(
+                EC.visibility_of_element_located((By.CSS_SELECTOR, 'div.css-1wa8o67'))
+            )
+        except TimeoutException:
+            timed_out = True
+
+        if not timed_out:
+            try:
+                desc_element = driver.find_element(
+                    By.CSS_SELECTOR, 'div.css-1wa8o67 span.css-11oczh8.eytdjj00'
+                )
+                description = desc_element.text
+            except (NoSuchElementException, TimeoutException):
+                description = None
+        else:
+            description = "TIMEOUT"
     except (TimeoutException, NoSuchElementException):
-        description = None
+        description = "TIMEOUT"
     finally:
         driver.close()
         driver.switch_to.window(main_window)
@@ -124,35 +132,58 @@ def parse_page_source(driver, html, shop_name):
     """
     Memparsing halaman list produk dan mengambil data dari masing-masing produk,
     termasuk mengambil deskripsi dari halaman detail produk.
+    Produk yang mengalami timeout saat memuat halaman detail akan di-skip.
     Dilengkapi dengan progress bar untuk setiap produk di toko tersebut.
     """
     soup = BeautifulSoup(html, 'html.parser')
     products = []
     
     product_containers = soup.find_all('div', class_='css-1sn1xa2')
-    # Progress bar untuk setiap produk pada toko
-    for container in tqdm(product_containers, desc=f"---> Scrapping {shop_name} products", leave=False, unit="produk"):
+    for container in tqdm(
+        product_containers, 
+        desc=f"---> Scrapping {shop_name} products", 
+        leave=False, 
+        unit="produk"
+    ):
         try:
-            # Ambil nama produk dan harga
-            name = container.find('div', {'class': 'prd_link-product-name'}).text.strip()
-            price_text = container.find('div', {'class': 'prd_link-product-price'}).text.strip()
-            price = int(re.sub(r'[^\d]', '', price_text))
-            
-            # Ambil rating jika tersedia
+            # Mengambil nama produk
+            name_elem = container.find('div', {'class': 'prd_link-product-name'})
+            name = name_elem.text.strip() if name_elem else ""
+
+            # Mengambil harga produk dan mengubahnya menjadi integer
+            price_elem = container.find('div', {'class': 'prd_link-product-price'})
+            if price_elem:
+                price_text = price_elem.text.strip()
+                price = int(re.sub(r'[^\d]', '', price_text))
+            else:
+                price = 0
+                
+            # Mengambil rating produk jika ada
             rating_elem = container.find('span', {'class': 'prd_rating-average-text'})
-            rating = float(rating_elem.text.strip()) if rating_elem else None
-            
-            # Ambil teks sales langsung (tanpa preprocessing) sesuai permintaan
-            sales = container.find('span', {'class': 'prd_label-integrity'}).text
-            
-            # Ambil URL produk dan URL gambar
+            rating = float(rating_elem.text.strip()) if rating_elem else float(0)
+
+            # Mengambil informasi sales
+            sales_elem = container.find('span', {'class': 'prd_label-integrity'})
+            sales = sales_elem.text if sales_elem else None
+
+            # Mengambil URL produk
             url_elem = container.find('a', {'class': 'pcv3__info-content'})
-            product_url = url_elem['href'] if url_elem else None
+            product_url = url_elem['href'] if url_elem and url_elem.has_attr('href') else None
+
+            # Mengambil URL gambar produk
             img_elem = container.find('img', {'class': 'css-1q90pod'})
-            image_url = img_elem['src'] if img_elem else None
+            image_url = img_elem['src'] if img_elem and img_elem.has_attr('src') else None
+
             
-            # Ambil deskripsi produk dengan mengunjungi halaman detail
-            description = get_product_description(driver, product_url) if product_url else None
+            # Jika ada URL produk, ambil deskripsi dengan timeout
+            if product_url:
+                description = get_product_description(driver, product_url, timeout=5)
+                # Jika terjadi timeout, skip produk ini
+                if description == "TIMEOUT":
+                    print(f"Skipping product from {shop_name} due to load timeout.")
+                    continue
+            else:
+                description = None
             
             product = {
                 'shop': shop_name,
@@ -171,12 +202,12 @@ def parse_page_source(driver, html, shop_name):
 
 def scrape_shop(driver, shop_url, query):
     """
-    Mengunjungi halaman produk toko, melakukan scrolling, dan mengambil data produk.
+    Mengunjungi halaman produk suatu toko, melakukan scrolling, dan mengambil data produk.
     """
     final_url = shop_url + "/product" + query
     driver.get(final_url)
     
-    # Lakukan scrolling agar seluruh produk termuat
+    # Lakukan scrolling untuk memastikan seluruh produk termuat
     dynamic_scroll(driver, pause_time=1.0, max_iter=20)
     driver.execute_script("window.scrollTo(0, 0);")
     time.sleep(1)
@@ -189,11 +220,11 @@ def scrape_shop(driver, shop_url, query):
 
 def clean_sales_column(df):
     """
-    Membersihkan kolom 'sales' agar tidak perlu preprocessing lagi.
+    Membersihkan kolom 'sales' agar siap digunakan untuk analisis.
     Proses:
       - Menghapus karakter '+' dan '.' serta kata 'terjual'
       - Mengganti 'rb' dengan '000'
-      - Mengkonversi kolom menjadi integer
+      - Mengkonversi nilai ke integer
     """
     df['sales'] = df['sales'].astype(str)\
         .str.replace('+', '', regex=False)\
@@ -204,7 +235,7 @@ def clean_sales_column(df):
     return df
 
 def main():
-    # Memuat konfigurasi dan URL toko
+    # Memuat keyword dan URL toko
     keyword = load_keyword("config.json")
     shop_urls = load_shop_urls()
     query = f"?q={keyword}"
@@ -227,7 +258,7 @@ def main():
     file_name = f"tokopedia_products_{keyword}_{datetime.now().strftime('%Y-%m-%d_%H.%M.%S')}.xlsx"
     df.to_excel(file_name, index=False)
     
-    # Menampilkan ringkasan hasil scraping
+    # Ringkasan hasil scraping
     if df.empty:
         print("No products found.")
     else:

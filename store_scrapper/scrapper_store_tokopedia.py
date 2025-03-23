@@ -17,10 +17,6 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 # Nonaktifkan peringatan urllib3
 urllib3.disable_warnings()
 
-# ---------------------------#
-#        UTILITY FUNCTIONS   #
-# ---------------------------#
-
 def load_keyword(json_file_path):
     """
     Memuat keyword pencarian dari file konfigurasi JSON.
@@ -59,10 +55,6 @@ def setup_driver():
     driver.implicitly_wait(5)
     return driver
 
-# ---------------------------#
-#        SCROLLING           #
-# ---------------------------#
-
 def dynamic_scroll(driver, pause_time=1.0, max_iter=20):
     """
     Melakukan scrolling secara dinamis untuk memuat seluruh produk.
@@ -88,9 +80,6 @@ def dynamic_scroll(driver, pause_time=1.0, max_iter=20):
         last_count = current_count
     return last_count
 
-# ---------------------------#
-#   PRODUCT DETAIL SCRAPING  #
-# ---------------------------#
 
 def get_product_description(driver, product_url):
     """
@@ -117,10 +106,6 @@ def get_product_description(driver, product_url):
         driver.close()
         driver.switch_to.window(main_window)
     return description
-
-# ---------------------------#
-#   PARSING & SCRAPING       #
-# ---------------------------#
 
 def parse_page_source(driver, html, shop_name):
     """
@@ -189,10 +174,6 @@ def scrape_shop(driver, shop_url, query):
     print(f"{len(products)} products scraped from {shop_name}")
     return products
 
-# ---------------------------#
-#       DATA CLEANING        #
-# ---------------------------#
-
 def clean_sales_column(df):
     """
     Membersihkan kolom 'sales' agar tidak perlu preprocessing lagi.
@@ -208,10 +189,6 @@ def clean_sales_column(df):
     df['sales'] = df['sales'].str.replace('rb', '000', regex=False)
     df['sales'] = pd.to_numeric(df['sales'], errors='coerce').fillna(0).astype(int)
     return df
-
-# ---------------------------#
-#           MAIN             #
-# ---------------------------#
 
 def main():
     # Memuat konfigurasi dan URL toko
